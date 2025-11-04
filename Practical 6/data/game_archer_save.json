@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Archer",
+    "health": 80,
+    "max_health": 80,
+    "armor": 18,
+    "attack": 15,
+    "items": [],
+    "abilities": []
+  }
+]

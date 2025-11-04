@@ -1,0 +1,39 @@
+# Сценарії використання — Практична 5
+
+=== Сценарій 1: Текстовий режим ===
+python -m main --text
+> add_text container heading
+> Мій документ
+> 1
+> add_text leaf paragraph
+> Це мій текст.
+> save demo_text
+> exit
+
+# Перевірка: відкрити data/text_demo_text.json
+
+# Завантаження:
+python -m main --text
+> load demo_text
+> print --whole
+# Мій документ
+Це мій текст.
+> exit
+
+
+=== Сценарій 2: Режим гри ===
+python -m main --chars
+> create char
+> Warrior
+> 100
+> 10
+> 15
+> save demo_game
+> exit
+
+# Перевірка: відкрити data/game_demo_game.json
+
+# Завантаження:
+python -m main --chars
+> load demo_game
+> exit
