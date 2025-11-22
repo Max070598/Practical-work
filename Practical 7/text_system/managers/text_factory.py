@@ -1,0 +1,118 @@
+# text_system/managers/text_factory.py
+from ..core.container import Container
+from ..core.paragraph import Paragraph
+from ..core.heading import Heading
+from ..core.link import Link
+from ..core.image import Image
+from models.text_element_dto import TextElementDTO
+from infra.display.idisplayer import IDisplayer
+from infra.data.irepository import IRepository
+from dataclasses import asdict
+import uuid
+from typing import Any
+
+
+class TextFactory:
+    def __init__(self, displayer: IDisplayer, repository: IRepository):
+        self._document = Container()
+        self.elements = {}
+        self._displayer = displayer
+        self._repository = repository
+
+    def _to_dto(self, element: Any) -> TextElementDTO:
+        """Convert domain element to DTO."""
+        if isinstance(element, Heading):
+            return TextElementDTO("heading", element.content, level=element._level)
+        elif isinstance(element, Paragraph):
+            return TextElementDTO("paragraph", element.content)
+        elif isinstance(element, Link):
+            return TextElementDTO("link", element.content, url=element._url)
+        elif isinstance(element, Image):
+            return TextElementDTO("image", element.content, url=element._url)
+        return TextElementDTO("unknown", str(element))
+
+    def add_paragraph(self, content: str) -> str:
+        paragraph = Paragraph(content)
+        element_id = str(uuid.uuid4())
+        self.elements[element_id] = paragraph
+        self._document.add_child(paragraph)
+        self._displayer.write_line(f"Added paragraph: {content}")
+        return element_id
+
+    def add_heading(self, content: str, level: int) -> str:
+        heading = Heading(content, level)
+        element_id = str(uuid.uuid4())
+        self.elements[element_id] = heading
+        self._document.add_child(heading)
+        self._displayer.write_line(f"Added heading: {content}")
+        return element_id
+
+    def remove_element(self, index: int) -> None:
+        if 0 <= index < len(self._document._children):
+            self._document.remove_child(index)
+            self._displayer.write_line(f"Removed element at index {index}")
+
+    def swap_elements(self, index1: int, index2: int) -> None:
+        self._document.swap_children(index1, index2)
+        self._displayer.write_line(f"Swapped elements {index1} <-> {index2}")
+
+    def render(self) -> str:
+        return self._document.render()
+
+    def render_toc(self) -> str:
+        return self._document.render_toc()
+
+    def save_document(self, name: str) -> None:
+        """Save document with 'text_' prefix (without .json)."""
+        filename = f"text_{name}"
+        dto_list = [asdict(self._to_dto(child)) for child in self._document._children]
+        self._repository.save(filename, dto_list)
+        self._displayer.write_line(f"Document saved: data/{filename}.json")
+
+    def load_document(self, name: str) -> None:
+        """Load document with 'text_' prefix (without .json)."""
+        filename = f"text_{name}" 
+        data = self._repository.load(filename)
+        if not data:
+            self._displayer.write_line("No saved document found.")
+            return
+
+        self._document = Container()
+        self.elements.clear()
+        for item in data:
+            if item["type"] == "heading":
+                self.add_heading(item["content"], item.get("level", 1))
+            elif item["type"] == "paragraph":
+                self.add_paragraph(item["content"])
+        self._displayer.write_line(f"Loaded document: {filename}.json")
+
+    def render_character(self, char: Any) -> str:
+        """Render Genshin character as Markdown."""
+        if not hasattr(char, "name"):
+            return "Invalid character"
+
+        stars = "★" * getattr(char, "rarity", 1)
+        element = getattr(char, 'element', '—')
+        if element and element != '—':
+            element = element.title()
+
+        md = f"# {char.name} ({stars})\n"
+        md += f"**Element**: {getattr(char, 'element', '—')}\n\n"
+        md += f"{getattr(char, 'description', 'No description')}\n\n"
+
+        if getattr(char, "abilities", []):
+            md += "## Abilities\n"
+            for ab in char.abilities:
+                name = ab.get("name", "Unknown")
+                desc = ab.get("description", "No description")
+                md += f"- **{name}**: {desc}\n"
+            md += "\n"
+
+        md += "## Stats\n"
+        md += "| Stat   | Value |\n"
+        md += "|--------|-------|\n"
+        md += f"| Health | {char.health} |\n"
+        md += f"| Armor  | {char.armor} |\n"
+        md += f"| Attack | {char.attack} |\n"
+
+        return md
